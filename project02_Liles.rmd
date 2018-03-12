@@ -1,0 +1,417 @@
+---
+title: "DATA 607 - Project 2"
+author: "Brian K. Liles"
+date: "March 10, 2018"
+output:
+  html_document: default
+  word_document: default
+---
+
+#Goal
+The goal for this project is to tidy and analyze data sets presented in the week 5 discussion section. 
+
+##Data Sets
+**New York City Compstat**
+Historcial Crime Data by Precinct
+Citywide Seven Major Felony Offenses 2000-2017
+
+**United States Census Bureau**
+Data by Enterpise Employment Size: Counties (State by County, totals)
+
+**Stanford Mass Shootings in America (MSA)**
+A high quality dataset from 19966-2016 with method, definitions, and references
+
+##Load packages
+```{r}
+library(tidyverse)
+library(knitr)
+```
+##New York City Compstat Data (Import and Tidy)
+Import the data and utilize the skip feature in order to arrive at the first headers with data.
+```{r}
+compstat <- read_csv("https://raw.githubusercontent.com/LilesB/DATA-607---Project-2/master/seven-major-felony-offenses-2000-2016%20(2).csv", skip = 4)
+```
+First step is to look at the dataset using the **View** feature
+```{r}
+View(compstat)
+```
+After viewing the dataset we can see that row 9 provides totals which we won't need. In addition, rows 10 - 16 are no longer needed so we will remove them using the following code:
+```{r}
+compstat <- compstat[-c(8:18),]
+```
+Next we take a look at the data using the **glimpse** function
+```{r}
+glimpse(compstat)
+```
+The **compstat** dataset currently has 7 observations and 18 variables. In order to tidy the data we use the **gather** feature in order to view the offenses, year, and totals.
+```{r}
+compstat <- gather(compstat,"YEAR","TOTALS",2:18)
+dim(compstat)
+```
+After using **gather** we arrive at 3 variables and 119 observations making it easier to conduct analysis.
+
+##New York City Compstat Data (Analyze)
+First it will be interesting to look at the total number of crimes by year. We use the piping to group the data by year and then add the seven major crimes and create a bar chart. 
+```{r}
+compstat %>% group_by(YEAR) %>% summarise(CRIMES = sum(TOTALS)) %>%
+    ggplot(mapping = aes(x = YEAR, y = CRIMES)) +
+               geom_bar(stat="identity", fill = "#6C9552")
+```
+
+Based on the graph we can see that overall crime in New York has decreased significantly since 2000. However, crime started to increase slightly in 2012 & 2013 and dropped to its lowest point in 2016.
+
+Create a dataset that will filter on the criminal offense of murder and view the years that recorded the highest values
+```{r}
+compstat_murder <- filter(compstat,OFFENSE =="MURDER & NON-NEGL. MANSLAUGHTER") 
+
+compstat_murder %>% arrange(TOTALS) %>% select(YEAR,TOTALS) %>% top_n(5) 
+```
+In 2000 New York City recorded 673 homicides making it the deadliest year in the last decade. Using **kable** we will list he entire list.
+
+```{r}
+kable(compstat_murder[2:3], format = "html", caption = "New York City Homicide Totals (2000 - 2016)")
+```
+
+
+Next we will calculate an estimated murder rate for each year in **compstat_murder** based on census data retrieved from https://en.wikipedia.org/wiki/Demographics_of_New_York_City. In order to do so we create a vector entitled **population** which will store the population for 2000 and 2010 and use the mean value of 8,091,711.
+
+Using **mutate** we then create **Per100** which divides the estimated population by 100000 and then create **murder_rate** that will divide **TOTALS** by **Per100** 
+
+```{r}
+population <- c(8008288,8175133)
+mean(population)
+
+compstat_murder %>% mutate(Per100 = 8091711/100000, MurderRate = TOTALS/Per100) %>% arrange(desc(MurderRate)) %>% select(YEAR, TOTALS, MurderRate)
+```
+In unlisted analysis we saw that 2000 reported the largest amount of criminal activity for each offense with the exception of rape. 
+
+###Rape
+```{r}
+compstat_rape <- filter(compstat,OFFENSE =="RAPE") 
+
+compstat_rape %>% arrange(TOTALS) %>% select(YEAR,TOTALS) %>% top_n(5)
+```
+**2002** led the city in the numbers of rapes with **2,144**.
+
+```{r}
+kable(compstat_rape[2:3], format = "html", caption = "New York City Rape Totals (2000 - 2016)")
+```
+
+
+To reduce redundancy we will look at the years that reported the least amount of robberies, felony assualts, and grand larceny by adding a (-) negative sign to the **top_n** feature. 
+
+###Robbery
+```{r}
+compstat_robbery <- filter(compstat,OFFENSE =="ROBBERY") 
+
+compstat_robbery %>% arrange(TOTALS) %>% select(YEAR,TOTALS) %>% top_n(-5)
+```
+
+**2016** recorded the least amount of robberies with **15,500**.
+
+```{r}
+kable(compstat_robbery[2:3], format = "html", caption = "New York City Robbery Totals (2000 - 2016)")
+```
+
+###Felony Assualt
+```{r}
+compstat_fa <- filter(compstat,OFFENSE =="FELONY ASSAULT") 
+
+compstat_fa %>% arrange(TOTALS) %>% select(YEAR,TOTALS) %>% top_n(-5)
+```
+**2008** recorded the least amount of felony assaults with **16,284**.
+
+```{r}
+kable(compstat_fa[2:3], format = "html", caption = "New York City Felony Assualt Totals (2000 - 2016)")
+```
+
+###Grand Larceny
+```{r}
+compstat_gl <- filter(compstat,OFFENSE =="GRAND LARCENY") 
+
+compstat_gl %>% arrange(TOTALS) %>% select(YEAR,TOTALS) %>% top_n(-5)
+```
+**2010** recorded the least amount of grand larceny with **37,835**.
+
+```{r}
+kable(compstat_rape[2:3], format = "html", caption = "New York City Grand Larceny Totals (2000 - 2016)")
+```
+
+
+**Burglary** and **Grand Larceny Motor Vehicles** were omitted because the both followed the trend of 2000 recording the lowest numbers while 2016 recorded the most.
+
+##New York City Compstat Data (outcome)
+Based on the analysis we can say with confidence that crime has decreased in New York City within the past decade.
+
+##United States Census Bureau (Import and Tidy)
+Import the data and utilize the skip feature in order to arrive at the first headers with data. We also noticed that the headers all have spaces between the names so we create a vector that will hold the names and apply.
+```{r}
+names <-c("FIPS_StateCode","StateDescr","FIPS_CountyCode",
+          "CtyDescription","EntEmploySize","NumFirms",
+          "NumEstablishments","Employment","ERF",
+          "ENF","AnnualPayroll","APNG","X13","X14","X15")
+uscb <- read_csv("https://raw.githubusercontent.com/LilesB/DATA-607---Project-2/master/county_totals_2015.csv", skip = 5, col_names = names)
+```
+First step is to look at the dataset using the **View** feature
+```{r}
+View(uscb)
+```
+After viewing the dataset we can see that rows 1 & 2 have NA values and can be removed.
+```{r}
+uscb <- uscb[-c(1:2),]
+```
+Next we take a look at the data using the **glimpse** function
+```{r}
+glimpse(uscb)
+```
+The **uscb** dataset currently has 15 observations and 15854 variables. We will look at the city of North Carolina so we will first create a dataset entitled **nc** and view the dimensions using **dim**
+```{r}
+nc <- filter(uscb,StateDescr=="North Carolina")
+dim(nc)
+```
+Next we will condense the amount of variables to look at while using **select** and choosing the following:
+
+```{r}
+nc <- nc %>% select(CtyDescription,EntEmploySize,
+              NumFirms,NumEstablishments,Employment,AnnualPayroll)
+```
+To get an idea on how many counties we have our next step is to use the **unique** feature:
+```{r}
+unique(nc$CtyDescription)
+```
+**nc** has 101 unique counties in the dataset
+
+Before we tidy the data we will first convert **NumFirms, Employment, AnnualPayroll** to a numeric variable in order to delve deeper in the dataset. We experienced warnings known as **NA coercion** due to commas in the character variables so we used the **gsub** function in order to remove the commas.
+
+```{r}
+nc$NumFirms <- as.numeric(gsub(",","",nc$NumFirms))
+nc$NumEstablishments <- as.numeric(gsub(",","",nc$NumEstablishments))
+nc$Employment <- as.numeric(gsub(",","",nc$Employment))
+nc$AnnualPayroll <- as.numeric(gsub(",","",nc$AnnualPayroll))
+```
+Identify counties that have the highest annual payroll based on the **EntEmploySize** being equal to **01:  Total**
+```{r}
+nc %>% filter(EntEmploySize == "01:  Total") %>% arrange(AnnualPayroll) %>%  select(CtyDescription,NumFirms,NumEstablishments,Employment,AnnualPayroll) %>% top_n(5)
+```
+Create a dataset entitled **nc_top5** based on the previous findings.
+```{r}
+nc_top5 <- nc %>% filter(CtyDescription =="Forsyth" |
+           CtyDescription =="Durham" |
+           CtyDescription =="Guilford" | 
+           CtyDescription =="Wake" |
+           CtyDescription =="Mecklenburg")
+kable(nc_top5, format = "html")
+```
+
+##United States Census Bureau (Analysis)
+Create a variable entitled **FirmEmpRatio** and **EstEmpRario** to obtain a ratios in order to eliminate size disparity.
+```{r}
+nc_top5 <- nc_top5 %>% mutate(FirmEmpRatio = NumFirms/Employment, EstEmpRatio = NumEstablishments/Employment) %>% select(CtyDescription,EntEmploySize, FirmEmpRatio,EstEmpRatio, AnnualPayroll)
+kable(nc_top5, format = "html")
+```
+View the counties with the highest total **FirmEmpRatio** based on the **01: Total** data element from the **EntEmploySize** variable:
+```{r}
+nc_top5 %>% filter(EntEmploySize == "01:  Total") %>% arrange(desc(FirmEmpRatio)) %>% select(CtyDescription,FirmEmpRatio,AnnualPayroll)
+```
+Based on these findings we see that Wake county has highest **FirmEmpRatio** but that variable doesn't correlate with **AnnualPayroll**
+
+Next, we view the counties with the highest total **EstEmpRatio** based on the **01: Total** data element from the **EntEmploySize** variable:
+```{r}
+nc_top5 %>% filter(EntEmploySize == "01:  Total") %>% arrange(desc(EstEmpRatio)) %>% select(CtyDescription,EstEmpRatio,AnnualPayroll)
+```
+Again Wake County is the leader in regards to **EstEmpRatio** but we also see that doesn't correlate with **AnnualPayroll**
+
+We will now take a look each level of the **EntEmploySize** against the **EstEmpRatio**:
+
+##Employment Size Less Than 20
+```{r}
+nc_top5 %>% filter(EntEmploySize == "02:  <20") %>% 
+    ggplot(mapping = aes(x = CtyDescription, y = EstEmpRatio))+
+    geom_bar(stat="identity", fill = "#010134")
+```
+
+```{r}
+nc_top5 %>% filter(EntEmploySize == "02:  <20") %>% arrange(desc(EstEmpRatio)) %>% select(CtyDescription,EstEmpRatio,AnnualPayroll)
+```
+For employment size less than 20 Meckenburg couny has a slight lead over Wake County with Durham county at the bottom.
+
+##Employment Size between 20 and 99
+```{r}
+nc_top5 %>% filter(EntEmploySize == "03:  20-99") %>% 
+    ggplot(mapping = aes(x = CtyDescription, y = EstEmpRatio))+
+    geom_bar(stat="identity", fill = "#afd965")
+```
+
+```{r}
+nc_top5 %>% filter(EntEmploySize == "03:  20-99") %>% arrange(desc(EstEmpRatio)) %>% select(CtyDescription,EstEmpRatio,AnnualPayroll)
+```
+For employment size between 20 and 99 Durham couny has a slight lead over Guilford County with Mecklenburg county at the bottom.
+
+##Employment Size between 100 and 499
+```{r}
+nc_top5 %>% filter(EntEmploySize == "04:  100-499") %>% 
+    ggplot(mapping = aes(x = CtyDescription, y = EstEmpRatio))+
+    geom_bar(stat="identity", fill = "#E7DFC3")
+```
+
+```{r}
+nc_top5 %>% filter(EntEmploySize == "04:  100-499") %>% arrange(desc(EstEmpRatio)) %>% select(CtyDescription,EstEmpRatio,AnnualPayroll)
+```
+
+For employment size between 100 and 499 Forsyth couny has a slight lead over Mecklenburg County with Guilford county at the bottom.
+
+##Employment Size of 500 and higher
+```{r}
+nc_top5 %>% filter(EntEmploySize == "05:  500+") %>% 
+    ggplot(mapping = aes(x = CtyDescription, y = EstEmpRatio))+
+    geom_bar(stat="identity", fill = "#616465")
+```
+
+```{r}
+nc_top5 %>% filter(EntEmploySize == "05:  500+") %>% arrange(desc(EstEmpRatio)) %>% select(CtyDescription,EstEmpRatio,AnnualPayroll)
+```
+
+For employment size of 500 and over Wake couny has a sizable lead over Mecklenburg County with Durham county at the bottom.
+
+##United States Census Bureau (outcome)
+Based on the analysis we can say that out of the top five counties in the state of North Carolina with the highest **AnnualPayroll** Wake County has the greatest variability in employment size. It was never had the bottom of any category and remained near the top and had the highest position of employment size of 500 and higher.
+
+##Stanford Mass Shootings in America (MSA) (Import and Tidy)
+Import the data and utilize the skip feature in order to arrive at the first headers with data.
+```{r}
+mass_shootings <- read_csv("https://raw.githubusercontent.com/LilesB/DATA-607---Project-2/master/mass_shooting_events_stanford_msa_release_06142016.csv")
+```
+First step is to look at the dataset using the **View** feature
+```{r}
+View(mass_shootings)
+```
+Next we will use the **glimpse** function to dig deeper in the **mass_shootings** datset
+```{r}
+glimpse(mass_shootings)
+```
+The **mass_shootings** dataset is rather large like the **uscb** dataset but differs with the amount of options to pull data from the untidy set. 
+
+After first glance we will be explore school shootings but first we will conduct some preliminary data analysis to find a few other data elements.
+
+##School Shootings
+First we will pull filter the **mass_shootings** dataset for school shootings and create a dataset entitled **school**:
+```{r}
+names(mass_shootings)
+```
+```{r}
+school <- mass_shootings %>% filter(`School Related`=="Yes")
+dim(school)
+```
+There are 73 instances where there were school shootings
+
+We will now condense the school dataset in order to explore a few variables:
+```{r}
+school <- school %>% select(`State`,`Total Number of Fatalities`,
+                            `Total Number of Victims`,
+                            `Day of Week`,
+                            `Shooter Race`,
+                            `Possible Motive - General`,
+                            `Place Type`,
+                            `Shooter Sex`)
+```
+##Stanford Mass Shootings in America (MSA) (Analysis)
+We will explore the variables to see if it makes sense to delve deeper or eliminate them from the data set excluding the number of fatalities,victims, and day of the week:
+
+###State
+```{r}
+school %>% count(`State`) %>% arrange(desc(n))
+```
+California has the most school related shootings with 10 but there is limited variability therefore it we will not pursue any further analysis.
+
+###Shooter Race
+```{r}
+school %>% count(`Shooter Race`) %>% arrange(desc(n))
+```
+Whites have the most school related shootings with 42 while Blacks come in behind with 14 so we will explore the total number of victims and fatalities.
+
+```{r}
+ggplot(data = school) + 
+  geom_point(mapping = aes(x = `Shooter Race`,
+                           y = `Total Number of Victims`,
+                           color = `Shooter Race`)) +
+    theme(axis.text.x=element_blank()) 
+#removes the text from the x-axis
+```
+
+We already knew from the count that Whites had the most school shootings, but it seems that Asian Americans logged in the most victims in a shooting.
+
+```{r}
+ggplot(data = school) + 
+  geom_point(mapping = aes(x = `Shooter Race`,
+                           y = `Total Number of Fatalities`,
+                           color = `Shooter Race`)) +
+    theme(axis.text.x=element_blank()) 
+```
+
+###Possible Motive - General
+```{r}
+school %>% count(`Possible Motive - General`) %>% arrange(desc(n))
+```
+Mental illness leads the numbers with 19, and there seems to be variability here once we get past mental illness, we will conduct the same analysis from prior which surround the number of victims and fatalities.
+
+```{r}
+ggplot(data = school) + 
+  geom_point(mapping = aes(x = `Possible Motive - General`,
+                           y = `Total Number of Victims`,
+                           color = `Possible Motive - General`)) +
+    theme(axis.text.x=element_blank()) 
+#removes the text from the x-axis
+```
+
+```{r}
+ggplot(data = school) + 
+  geom_point(mapping = aes(x = `Possible Motive - General`,
+                           y = `Total Number of Fatalities`,
+                           color = `Possible Motive - General`)) +
+    theme(axis.text.x=element_blank()) 
+#removes the text from the x-axis
+```
+
+Although mental illness seems like the driving force behind school shootings we see that there are quite a few of these acts that are unknown. The unknown factor also claimed the second most fatalities.
+
+###Place Type
+```{r}
+school %>% count(`Place Type`) %>% arrange(desc(n))
+```
+The top three places were Colleges, Secondary Schools, and Primary Schools with counts of 27, 21, and 16 respectively. This data element will be excluded.
+
+###Shooter Sex
+```{r}
+school %>% count(`Shooter Sex`) %>% arrange(desc(n))
+```
+The disparities are huge with 70 males and 3 females; data will be excluded.
+
+###Day of Week
+```{r}
+school %>% count(`Day of Week`) %>% arrange(desc(n))
+```
+
+What stands out the most is the fact there were 5 school shootings that occurred on the weekend; 2 and 3 respectively. Out of the school/work week it seems that Wednesday is the safest day with only 6 school shootings while Thursday and Monday are the most violent.
+
+```{r}
+ggplot(data = school) + 
+  geom_point(mapping = aes(x = `Day of Week`,
+                           y = `Total Number of Fatalities`,
+                           color = `Day of Week`)) +
+    theme(axis.text.x=element_blank()) 
+#removes the text from the x-axis
+```
+
+Even though Thursday logged the most school shootings we see that Monday has registered the most victims.
+
+```{r}
+ggplot(data = school) + 
+  geom_point(mapping = aes(x = `Day of Week`,
+                           y = `Total Number of Fatalities`,
+                           color = `Day of Week`)) +
+    theme(axis.text.x=element_blank()) 
+```
+With 15 school shootings Friday took the second spot in the number of fatalities.
+
+##Stanford Mass Shootings in America (MSA) (outcome)
+The issue with school shootings has become a hot issue once again in the US, and what I found most interesting was the days of the week these horrific acts occurred. 
